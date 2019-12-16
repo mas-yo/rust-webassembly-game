@@ -1,1 +1,0 @@
-{"rustc":13568843128949978479,"features":"[]","target":2599474184219679012,"profile":2574335274271406459,"path":10872709659218687626,"deps":[[8025189348045896490,"wasm_bindgen",false,5075186269283344836]],"local":[{"CheckDepInfo":{"dep_info":"wasm32-unknown-unknown/release/.fingerprint/client-5c96a58d5cf99c1a/dep-lib-client"}}],"rustflags":[],"metadata":16176760604430584905}
