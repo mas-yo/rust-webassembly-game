@@ -3,7 +3,7 @@
     "serve": "webpack-dev-server"
   },
   "dependencies": {
-    "@mas-yo/client": "^0.1.0"
+    "@mas-yo/client": "0.1.1"
   },
   "devDependencies": {
     "webpack": "^4.25.1",
