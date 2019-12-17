@@ -1,3 +1,6 @@
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/mas-yo/rust-webassembly-game)
+
 ## How to install
 
 ```sh

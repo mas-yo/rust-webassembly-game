@@ -1,7 +1,34 @@
 use std::f64;
+use std::rc::Rc;
+use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::console;
+
+mod components;
+mod systems;
+mod world;
+
+pub(crate) type EntityID = u64;
+pub(crate) type CanvasContext = web_sys::CanvasRenderingContext2d;
+
+#[derive(Default)]
+pub(crate) struct IdGenerator<T> {
+    current: T,
+}
+
+impl<T> IdGenerator<T>
+where
+    T: num::traits::Num + Copy,
+{
+    fn new() -> Self {
+        Self { current: T::one() }
+    }
+    fn next(&mut self) -> T {
+        self.current = self.current.add(T::one());
+        self.current
+    }
+}
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
@@ -20,50 +47,58 @@ pub fn main_js() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
     // Your code goes here!
-    console::log_1(&JsValue::from_str("Hello world!"));
+    console::log_1(&JsValue::from_str("application started"));
 
-    start();
-
-    Ok(())
+    start()
 }
 
-pub fn start() {
-    let document = web_sys::window().unwrap().document().unwrap();
-    let canvas = document.get_element_by_id("canvas").unwrap();
-    let canvas: web_sys::HtmlCanvasElement = canvas
-        .dyn_into::<web_sys::HtmlCanvasElement>()
-        .map_err(|_| ())
-        .unwrap();
+use world::*;
 
-    let context = canvas
-        .get_context("2d")
-        .unwrap()
-        .unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        .unwrap();
+#[derive(Clone)]
+pub(crate) struct WindowEnv {
+    pub window: web_sys::Window,
+    pub document: web_sys::Document,
+    pub canvas: web_sys::HtmlCanvasElement,
+    pub canvas_context: web_sys::CanvasRenderingContext2d,
+}
 
-    context.begin_path();
+impl WindowEnv {
+    fn create() -> Result<WindowEnv, JsValue> {
+        let win = web_sys::window().ok_or(JsValue::from_str("no window"))?;
+        let doc = win.document().ok_or(JsValue::from_str("no document"))?;
+        let can = doc.get_element_by_id("canvas").ok_or(JsValue::from_str("no canvas"))?.dyn_into::<web_sys::HtmlCanvasElement>().or(Err(JsValue::from_str("cast error")))?;
+        let con = can.get_context("2d")?.ok_or(JsValue::from_str("no 2d context"))?.dyn_into::<web_sys::CanvasRenderingContext2d>().or(Err(JsValue::from_str("cast error")))?;
 
-    // Draw the outer circle.
-    context
-        .arc(75.0, 75.0, 50.0, 0.0, f64::consts::PI * 2.0)
-        .unwrap();
+        Ok(Self{
+            window: win, document:doc, canvas:can, canvas_context:con
+        })
+    }
 
-    // Draw the mouth.
-    context.move_to(110.0, 75.0);
-    context.arc(75.0, 75.0, 35.0, 0.0, f64::consts::PI).unwrap();
+    fn request_animation_frame(&self, f: &Closure<dyn FnMut()>) -> Result<i32, JsValue> {
+        self.window.request_animation_frame(f.as_ref().unchecked_ref())
+    }
+}
 
-    // Draw the left eye.
-    context.move_to(65.0, 65.0);
-    context
-        .arc(60.0, 65.0, 5.0, 0.0, f64::consts::PI * 2.0)
-        .unwrap();
+pub fn start() -> Result<(), JsValue> {
 
-    // Draw the right eye.
-    context.move_to(95.0, 65.0);
-    context
-        .arc(90.0, 65.0, 5.0, 0.0, f64::consts::PI * 2.0)
-        .unwrap();
+    let win_env = WindowEnv::create()?;
 
-    context.stroke();
+    let mut world = World::new(win_env.clone());
+    // // world.update();
+
+    let f = Rc::new(RefCell::new(None));
+    let g = f.clone();
+
+    {
+        let env = win_env.clone();
+        *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+            env.canvas_context.clear_rect(0f64, 0f64, env.canvas.width() as f64, env.canvas.height() as f64);
+            world.update();
+
+            env.request_animation_frame(f.borrow().as_ref().unwrap()).unwrap();
+        }) as Box<dyn FnMut()>));
+    }
+    win_env.request_animation_frame(g.borrow().as_ref().unwrap())?;
+
+    Ok(())
 }
